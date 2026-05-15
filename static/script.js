@@ -11,7 +11,7 @@
 // ============================================================
 // Detect which page we are on
 // ============================================================
-var isIndexPage  = !!document.getElementById("recommend-form");
+var isIndexPage = !!document.getElementById("recommend-form");
 var isDetailPage = typeof PROJECT_ID !== "undefined";
 
 
@@ -20,7 +20,7 @@ var isDetailPage = typeof PROJECT_ID !== "undefined";
 // ============================================================
 (function initMobileNav() {
   var toggle = document.getElementById("nav-mobile-toggle");
-  var menu   = document.getElementById("nav-mobile-menu");
+  var menu = document.getElementById("nav-mobile-menu");
 
   if (!toggle || !menu) return;
 
@@ -46,19 +46,19 @@ var isDetailPage = typeof PROJECT_ID !== "undefined";
 if (isIndexPage) {
 
   // DOM references
-  var form              = document.getElementById("recommend-form");
-  var submitBtn         = document.getElementById("submit-btn");
-  var btnLabel          = document.getElementById("btn-label");
-  var btnLoading        = document.getElementById("btn-loading");
-  var resultsSection    = document.getElementById("results-section");
-  var resultsGrid       = document.getElementById("results-grid");
-  var resultsLoadingEl  = document.getElementById("results-loading");
-  var resultsEmptyEl    = document.getElementById("results-empty");
-  var emptyMessageEl    = document.getElementById("empty-message");
-  var skillsHidden      = document.getElementById("skills");
-  var skillsTextInput   = document.getElementById("skills-input");
-  var chipsSelectedEl   = document.getElementById("skill-chips-selected");
-  var quickPickChips    = document.querySelectorAll(".skill-chip");
+  var form = document.getElementById("recommend-form");
+  var submitBtn = document.getElementById("submit-btn");
+  var btnLabel = document.getElementById("btn-label");
+  var btnLoading = document.getElementById("btn-loading");
+  var resultsSection = document.getElementById("results-section");
+  var resultsGrid = document.getElementById("results-grid");
+  var resultsLoadingEl = document.getElementById("results-loading");
+  var resultsEmptyEl = document.getElementById("results-empty");
+  var emptyMessageEl = document.getElementById("empty-message");
+  var skillsHidden = document.getElementById("skills");
+  var skillsTextInput = document.getElementById("skills-input");
+  var chipsSelectedEl = document.getElementById("skill-chips-selected");
+  var quickPickChips = document.querySelectorAll(".skill-chip");
 
   // Tracks currently selected skills to prevent duplicates
   var selectedSkills = [];
@@ -68,59 +68,258 @@ if (isIndexPage) {
   // Skill chip manager
   // ----------------------------------------------------------
 
+  // Skills list for autocomplete (from skills.js)
+  var availableSkills = [];
+  if (typeof skills !== "undefined" && Array.isArray(skills) && skills.length > 0) {
+    availableSkills = skills.map(function (s) { return s.label; });
+  } else {
+    // Fallback if skills.js doesn't load
+    availableSkills = [
+      "Python", "JavaScript", "Java", "C++", "HTML", "CSS", "React", "Node.js",
+      "Django", "Flask", "SQL", "MongoDB", "AWS", "Docker", "Kubernetes", "Git",
+      "C#", "Ruby", "PHP", "Go", "Swift", "TypeScript", "Angular", "Vue.js",
+      "Spring", "Flutter", "TensorFlow", "PyTorch", "Data Science",
+      "Machine Learning", "Artificial Intelligence", "DevOps", "Cybersecurity",
+      "Blockchain", "UI/UX Design", "Game Development", "CI/CD", "REST API", "GraphQL"
+    ];
+  }
+
+  var suggestionsDiv = document.getElementById("skills-suggestions");
+  var skillWrap = document.getElementById("skill-input-wrap");
+  var visibleSuggestions = [];
+  var activeSuggestionIndex = -1;
+
+  availableSkills = availableSkills.filter(function (skill, index, list) {
+    return typeof skill === "string" && skill.trim() &&
+      list.findIndex(function (item) {
+        return item.toLowerCase() === skill.toLowerCase();
+      }) === index;
+  });
+
+  if (suggestionsDiv) {
+    suggestionsDiv.setAttribute("role", "listbox");
+  }
+
+  function normalizeSkill(skill) {
+    return skill.trim().toLowerCase();
+  }
+
+  function isSkillSelected(skill) {
+    var normalizedSkill = normalizeSkill(skill);
+    return selectedSkills.some(function (selectedSkill) {
+      return normalizeSkill(selectedSkill) === normalizedSkill;
+    });
+  }
+
+  function getCanonicalSkill(rawSkill) {
+    var normalizedSkill = normalizeSkill(rawSkill);
+    var matchedSkill = availableSkills.find(function (skill) {
+      return normalizeSkill(skill) === normalizedSkill;
+    });
+
+    return matchedSkill || rawSkill.trim();
+  }
+
+  function getFilteredSkills(query) {
+    var normalizedQuery = normalizeSkill(query);
+
+    return availableSkills.filter(function (skill) {
+      return normalizeSkill(skill).includes(normalizedQuery) && !isSkillSelected(skill);
+    }).slice(0, 8);
+  }
+
+  function syncSuggestionsA11yState() {
+    skillsTextInput.setAttribute("aria-expanded", visibleSuggestions.length > 0 ? "true" : "false");
+  }
+
+  function renderActiveSuggestion() {
+    if (!suggestionsDiv) return;
+
+    suggestionsDiv.querySelectorAll(".suggestion-item").forEach(function (item, index) {
+      var isActive = index === activeSuggestionIndex;
+      item.classList.toggle("suggestion-item--active", isActive);
+      item.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+  }
+
+  function hideSuggestions() {
+    visibleSuggestions = [];
+    activeSuggestionIndex = -1;
+
+    if (suggestionsDiv) {
+      suggestionsDiv.style.display = "none";
+      suggestionsDiv.innerHTML = "";
+    }
+
+    syncSuggestionsA11yState();
+  }
+
+  function selectSuggestion(skill) {
+    addSkill(skill);
+    skillsTextInput.value = "";
+    hideSuggestions();
+    skillsTextInput.focus();
+  }
+
+  function displaySuggestions(items) {
+    if (!suggestionsDiv) return;
+
+    visibleSuggestions = items;
+    activeSuggestionIndex = -1;
+
+    if (items.length === 0) {
+      hideSuggestions();
+      return;
+    }
+
+    suggestionsDiv.innerHTML = "";
+    items.forEach(function (skill, index) {
+      var item = document.createElement("div");
+      item.className = "suggestion-item";
+      item.textContent = skill;
+      item.setAttribute("role", "option");
+      item.setAttribute("id", "skills-suggestion-" + index);
+      item.setAttribute("aria-selected", "false");
+
+      // Prevent the input blur handler from closing the menu before click runs.
+      item.addEventListener("mousedown", function (evt) {
+        evt.preventDefault();
+      });
+
+      item.addEventListener("mouseenter", function () {
+        activeSuggestionIndex = index;
+        renderActiveSuggestion();
+      });
+
+      item.addEventListener("click", function () {
+        selectSuggestion(skill);
+      });
+
+      suggestionsDiv.appendChild(item);
+    });
+
+    suggestionsDiv.style.display = "block";
+    syncSuggestionsA11yState();
+  }
+
+  function updateQuickPickState() {
+    quickPickChips.forEach(function (chip) {
+      var isActive = isSkillSelected(chip.getAttribute("data-skill") || "");
+      chip.classList.toggle("active", isActive);
+      chip.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+  }
+
   // Add skill on Enter key in the text input
   skillsTextInput.addEventListener("keydown", function (evt) {
+    if (evt.key === "ArrowDown" || evt.key === "ArrowUp") {
+      if (visibleSuggestions.length === 0) {
+        displaySuggestions(getFilteredSkills(skillsTextInput.value));
+      }
+
+      if (visibleSuggestions.length === 0) return;
+
+      evt.preventDefault();
+      if (evt.key === "ArrowDown") {
+        activeSuggestionIndex = (activeSuggestionIndex + 1) % visibleSuggestions.length;
+      } else {
+        activeSuggestionIndex = activeSuggestionIndex <= 0
+          ? visibleSuggestions.length - 1
+          : activeSuggestionIndex - 1;
+      }
+
+      renderActiveSuggestion();
+      return;
+    }
+
+    if (evt.key === "Escape") {
+      hideSuggestions();
+      return;
+    }
+
     if (evt.key === "Enter") {
       evt.preventDefault();
-      var value = skillsTextInput.value.trim();
-      if (value) {
-        addSkill(value);
+
+      if (activeSuggestionIndex >= 0 && visibleSuggestions[activeSuggestionIndex]) {
+        selectSuggestion(visibleSuggestions[activeSuggestionIndex]);
+        return;
+      }
+
+      if (skillsTextInput.value.trim()) {
+        addSkill(skillsTextInput.value);
         skillsTextInput.value = "";
       }
+
+      hideSuggestions();
     }
   });
+
+  // Show suggestions on input
+  skillsTextInput.addEventListener("input", function (evt) {
+    var typedValue = evt.target.value.trim();
+
+    if (typedValue.length === 0) {
+      hideSuggestions();
+      return;
+    }
+
+    displaySuggestions(getFilteredSkills(typedValue));
+  });
+
+  skillsTextInput.addEventListener("focus", function () {
+    if (skillsTextInput.value.trim()) {
+      displaySuggestions(getFilteredSkills(skillsTextInput.value));
+    }
+  });
+
+  // Hide suggestions when input loses focus
+  skillsTextInput.addEventListener("blur", function () {
+    setTimeout(function () { hideSuggestions(); }, 150);
+  });
+
+  if (skillWrap) {
+    skillWrap.addEventListener("click", function () {
+      skillsTextInput.focus();
+    });
+  }
 
   // Add skill on quick-pick chip click
   quickPickChips.forEach(function (chip) {
     chip.addEventListener("click", function () {
       addSkill(chip.getAttribute("data-skill"));
-      chip.classList.add("active");
+      hideSuggestions();
+      skillsTextInput.value = "";
     });
   });
 
-  // Focus the text input when clicking anywhere in the chip wrap
-  var skillWrap = document.getElementById("skill-input-wrap");
-  if (skillWrap) {
-    skillWrap.addEventListener("click", function () { skillsTextInput.focus(); });
-  }
+  document.addEventListener("click", function (evt) {
+    if (skillWrap && !skillWrap.contains(evt.target)) {
+      hideSuggestions();
+    }
+  });
 
   function addSkill(rawSkill) {
-    var skill = rawSkill.trim();
+    var skill = getCanonicalSkill(rawSkill);
     if (!skill) return;
 
     // Block duplicate entries (case-insensitive)
-    var isDuplicate = selectedSkills.some(function (s) {
-      return s.toLowerCase() === skill.toLowerCase();
-    });
-    if (isDuplicate) return;
+    if (isSkillSelected(skill)) return;
 
     selectedSkills.push(skill);
     renderSelectedChips();
     syncSkillsHiddenInput();
+    updateQuickPickState();
     clearFieldError("skills-error");
   }
 
   function removeSkill(skill) {
-    selectedSkills = selectedSkills.filter(function (s) { return s !== skill; });
+    selectedSkills = selectedSkills.filter(function (selectedSkill) {
+      return normalizeSkill(selectedSkill) !== normalizeSkill(skill);
+    });
+
     renderSelectedChips();
     syncSkillsHiddenInput();
-
-    // Un-highlight the quick-pick button if it matches the removed skill
-    quickPickChips.forEach(function (chip) {
-      if (chip.getAttribute("data-skill") === skill) {
-        chip.classList.remove("active");
-      }
-    });
+    updateQuickPickState();
   }
 
   function renderSelectedChips() {
@@ -150,6 +349,8 @@ if (isIndexPage) {
     // Keep the hidden <input> in sync for form serialisation
     skillsHidden.value = selectedSkills.join(", ");
   }
+
+  updateQuickPickState();
 
 
   // ----------------------------------------------------------
@@ -204,6 +405,12 @@ if (isIndexPage) {
     evt.preventDefault();
     clearAllErrors();
 
+    if (skillsTextInput.value.trim()) {
+      addSkill(skillsTextInput.value);
+      skillsTextInput.value = "";
+      hideSuggestions();
+    }
+
     if (!validateForm()) return;
 
     setLoadingState(true);
@@ -245,6 +452,21 @@ if (isIndexPage) {
         .catch(function () {
 
           setLoadingState(false);
+    var payload = {
+      skills: skillsHidden.value.trim() || skillsTextInput.value.trim(),
+      level: document.getElementById("level").value,
+      interest: document.getElementById("interest").value,
+      time: document.getElementById("time").value
+    };
+
+    fetch("/api/recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        setLoadingState(false);
 
           var generalErr = document.getElementById("form-error-general");
 
@@ -261,17 +483,19 @@ if (isIndexPage) {
     submitBtn.setAttribute("aria-busy", isLoading);
     btnLabel.style.display = isLoading ? "none" : "inline";
     btnLoading.style.display = isLoading ? "inline-flex" : "none";
+    btnLabel.style.display = isLoading ? "none" : "inline";
+    btnLoading.style.display = isLoading ? "inline" : "none";
 
     if (isLoading) {
       // Show the results section with only the loading indicator visible
-      resultsSection.style.display    = "block";
-      resultsLoadingEl.style.display  = "block";
-      resultsGrid.style.display       = "none";
-      resultsEmptyEl.style.display    = "none";
+      resultsSection.style.display = "block";
+      resultsLoadingEl.style.display = "block";
+      resultsGrid.style.display = "none";
+      resultsEmptyEl.style.display = "none";
       resultsSection.scrollIntoView({ behavior: "smooth" });
     } else {
-      resultsLoadingEl.style.display  = "none";
-      resultsGrid.style.display       = "grid";
+      resultsLoadingEl.style.display = "none";
+      resultsGrid.style.display = "grid";
     }
   }
 
@@ -281,20 +505,22 @@ if (isIndexPage) {
   // ----------------------------------------------------------
 
   function renderResults(projects, message) {
-    resultsSection.style.display    = "block";
-    resultsLoadingEl.style.display  = "none";
-    resultsGrid.innerHTML           = "";
+    resultsSection.style.display = "block";
+    resultsLoadingEl.style.display = "none";
+    resultsGrid.innerHTML = "";
 
     if (!projects || projects.length === 0) {
       resultsGrid.style.display     = "none";
       resultsEmptyEl.style.display  = "block";
+      resultsGrid.style.display = "none";
+      resultsEmptyEl.style.display = "block";
       if (message && emptyMessageEl) emptyMessageEl.textContent = message;
       resultsSection.scrollIntoView({ behavior: "smooth" });
       return;
     }
 
-    resultsEmptyEl.style.display  = "none";
-    resultsGrid.style.display     = "grid";
+    resultsEmptyEl.style.display = "none";
+    resultsGrid.style.display = "grid";
 
     projects.forEach(function (project) {
       resultsGrid.appendChild(buildProjectCard(project));
@@ -309,12 +535,12 @@ if (isIndexPage) {
 
     // Title
     var title = document.createElement("h3");
-    title.className   = "project-card-title";
+    title.className = "project-card-title";
     title.textContent = project.title;
 
     // Description (truncated for visual consistency)
     var desc = document.createElement("p");
-    desc.className   = "project-card-desc";
+    desc.className = "project-card-desc";
     desc.textContent = truncate(project.description, 120);
 
     // Tags row
@@ -338,9 +564,9 @@ if (isIndexPage) {
     footer.className = "project-card-footer";
 
     var link = document.createElement("a");
-    link.className   = "btn-details";
+    link.className = "btn-details";
     link.textContent = "View Full Project";
-    link.href        = "/project/" + project.id;
+    link.href = "/project/" + project.id;
 
     footer.appendChild(link);
 
@@ -372,13 +598,13 @@ if (isIndexPage) {
 // ============================================================
 if (isDetailPage) {
 
-  var codePanel         = document.getElementById("code-panel");
-  var codePanelOverlay  = document.getElementById("code-panel-overlay");
-  var codeContentEl     = document.getElementById("code-content");
+  var codePanel = document.getElementById("code-panel");
+  var codePanelOverlay = document.getElementById("code-panel-overlay");
+  var codeContentEl = document.getElementById("code-content");
   var codePanelFilename = document.getElementById("code-panel-filename");
-  var btnViewCode       = document.getElementById("btn-view-code");
-  var btnViewCodeSm     = document.getElementById("btn-view-code-sm");
-  var btnClosePanel     = document.getElementById("code-panel-close");
+  var btnViewCode = document.getElementById("btn-view-code");
+  var btnViewCodeSm = document.getElementById("btn-view-code-sm");
+  var btnClosePanel = document.getElementById("code-panel-close");
 
   // Cache flag so code is only fetched once per page load
   var codeFetched = false;
@@ -410,7 +636,7 @@ if (isDetailPage) {
           return;
         }
         if (codePanelFilename) codePanelFilename.textContent = data.filename;
-        if (codeContentEl)     codeContentEl.textContent     = data.code;
+        if (codeContentEl) codeContentEl.textContent = data.code;
         codeFetched = true;
       })
       .catch(function () {
@@ -432,5 +658,70 @@ if (isDetailPage) {
   document.addEventListener("keydown", function (evt) {
     if (evt.key === "Escape") closeCodePanel();
   });
+
+  // ----------------------------------------------------------
+  // Copy Code button
+  // ----------------------------------------------------------
+  var btnCopyCode  = document.getElementById("btn-copy-code");
+  var copyToast    = document.getElementById("copy-toast");
+  var toastTimeout = null;
+
+  function showCopySuccess() {
+    if (!btnCopyCode) return;
+
+    // Swap icons on the button
+    var copyIcon  = btnCopyCode.querySelector(".copy-icon");
+    var checkIcon = btnCopyCode.querySelector(".check-icon");
+    var btnLabel  = btnCopyCode.querySelector(".copy-btn-label");
+
+    if (copyIcon)  copyIcon.style.display  = "none";
+    if (checkIcon) checkIcon.style.display = "inline";
+    if (btnLabel)  btnLabel.textContent    = "Copied!";
+    btnCopyCode.classList.add("copied");
+    btnCopyCode.disabled = true;
+
+    // Show toast
+    if (copyToast) {
+      copyToast.classList.add("show");
+    }
+
+    // Auto-reset after 2.5 s
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(function () {
+      if (copyIcon)  copyIcon.style.display  = "inline";
+      if (checkIcon) checkIcon.style.display = "none";
+      if (btnLabel)  btnLabel.textContent    = "Copy Code";
+      btnCopyCode.classList.remove("copied");
+      btnCopyCode.disabled = false;
+      if (copyToast) copyToast.classList.remove("show");
+    }, 2500);
+  }
+
+  if (btnCopyCode) {
+    btnCopyCode.addEventListener("click", function () {
+      var code = codeContentEl ? codeContentEl.textContent : "";
+      if (!code || code === "Loading..." || code === "Loading starter code...") return;
+
+      // Use Clipboard API with textarea fallback
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(showCopySuccess).catch(function () {
+          fallbackCopy(code);
+        });
+      } else {
+        fallbackCopy(code);
+      }
+    });
+  }
+
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand("copy"); showCopySuccess(); } catch (e) { /* silent fail */ }
+    document.body.removeChild(ta);
+  }
 
 } // end isDetailPage

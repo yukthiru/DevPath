@@ -10,7 +10,6 @@
   family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 </head>
 <body>
-
   <!-- ============================================================
        Navigation
        ============================================================ -->
@@ -280,6 +279,12 @@
                   placeholder="Type a skill and press Enter..."
                   autocomplete="off" 
                   />
+                  autocomplete="off"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="skills-suggestions"
+                />
+                <div id="skills-suggestions" class="skills-suggestions"></div>
               </div>
               <!-- Hidden field holds the final comma-separated value -->
               <input type="hidden" id="skills" name="skills" />
@@ -462,6 +467,7 @@
     </div>
   </footer>
 
+  <script src="/static/data/skills.js"></script>
   <script src="/static/script.js"></script>
 </body>
 </html>
