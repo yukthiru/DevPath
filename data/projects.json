@@ -250,31 +250,31 @@
   },
   {
     "id": 9,
-    "title": "API ETL pipeline",
-    "skills": ["Python","pandas","requests","os module"],
+    "title": "API ETL Pipeline",
+    "skills": ["Python","pandas","requests"],
     "level": "Intermediate",
     "interest": "Data",
     "time": "Medium",
-    "description": "Upload a API url, which then fetches data from the API, and automatically transform it into a CSV file.",
+    "description": "Enter a public API URL to fetch data and automatically transform it into a structured CSV dataset.",
     "features": [
-      "Fetch requests from API",
+      "Fetch data from public APIs",
       "handle missing values",
       "Normalize nested JSON",
       "Generate summary statistics",
       "Export the processed CSV for any other Analytics projects"
     ],
-    "tech_stack": ["Python", "pandas","requests","JSON","os module"],
+    "tech_stack": ["Python", "pandas","requests","JSON"],
     "roadmap": [
       "Step 1:  Install required modules via pip",
       "Step 2:  Find a public API key for this project",
       "Step 3:  Fetch the data from the API using requests",
-      "Step 4:  Validate the reponse you just fetched From the API",
+      "Step 4:  Validate the response you just fetched From the API",
       "Step 5:  Normalize the nested JSON data by flattening it",
       "Step 6:  Use the fetched data to build a pandas dataframe",
       "Step 7:  Handle missing values or duplicate values",
-      "Step 8:  Export the cleaned datatable to a CSV format",
+      "Step 8:  Export the cleaned dataset to CSV format",
       "Step 9:  Generate a summary for the newly created CSV dataset",
-      "Step 10: Test the file with atleast two different public API keys"
+      "Step 10: Test the file with at least two different public APIs"
     ],
     "resources": [
       "pandas docs: https://pandas.pydata.org/docs",
